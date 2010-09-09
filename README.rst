@@ -1,10 +1,7 @@
 Flask-Brevé
--------------
+-----------
 
-A Brevé templates loader for Flask applications.
+A Brevé_ templates loader for Flask_ applications.
 
-Links
-`````
-* `Flask http://flask.pocoo.org/`_
-* `Brevé http://breve.twisty-industries.com/`_
-* `documentation <http://packages.python.org/Flask-Breve>`_
+.. _Flask: http://flask.pocoo.org/
+.. _Brevé: http://breve.twisty-industries.com/
