@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Flask-Brevé
+Flask-Breve
 -----------
 
-A Brevé_ templates loader for Flask_ applications.
+A Breve_ templates loader for Flask_ applications.
 
 .. _Flask: http://flask.pocoo.org/
-.. _Brevé: http://breve.twisty-industries.com/
+.. _Breve: http://breve.twisty-industries.com/
 
 """
 from setuptools import setup
@@ -18,7 +18,7 @@ setup(
     url='http://github.com/dgerber/Flask-Breve',
     license='BSD',
     author='Daniel Gerber',
-    author_email='',
+    author_email='daniel.g.gerber@gmail.com',
     description='Breve templating with Flask',
     long_description=__doc__,
     packages=['flaskext'],
