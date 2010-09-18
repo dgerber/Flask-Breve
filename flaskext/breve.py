@@ -20,6 +20,7 @@
 
 from __future__ import with_statement, absolute_import
 import os.path
+from functools import wraps
 from werkzeug import cached_property
 import flask
 import breve
@@ -156,4 +157,22 @@ def flattened_by(method_name):
     def decorator(cls):
         breve.register_flattener(cls, getattr(cls, method_name))
         return cls
+    return decorator
+
+
+def templated(name=None):
+    """Decorator for view functions.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            ctx = f(*args, **kwargs)
+            if ctx is None:
+                ctx = {}
+            elif not isinstance(ctx, dict):
+                return ctx
+            template_name = name if name is not None else\
+                    flask.request.endpoint.replace('.', '/')
+            return render_template(template_name, context=ctx)
+        return decorated
     return decorator
