@@ -113,7 +113,7 @@ class Breve(object):
         return TemplateLoader(self.app)
 
 
-for k in ['url_for', 'get_flashed_messages']:
+for k in ['url_for', 'get_flashed_messages', 'g']:
     breve.register_global(k, getattr(flask, k))
 
 
