@@ -14,7 +14,7 @@ from setuptools import setup
 
 setup(
     name='Flask-Breve',
-    version='0.1',
+    version='0.2',
     url='http://github.com/dgerber/Flask-Breve',
     license='BSD',
     author='Daniel Gerber',

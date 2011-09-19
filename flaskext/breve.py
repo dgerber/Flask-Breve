@@ -23,39 +23,23 @@ import os.path
 from functools import wraps
 from werkzeug import cached_property
 import flask
+from flask.signals import template_rendered
 import breve
-from breve.tags import html as xhtml
-try:
-    from breve.tags import html4 #broken in current breve
-except:
-    html4 = xhtml
+from breve.tags import html as xhtml, html4
 
 
-class TemplateLoader(object):
-    """Loads templates from the same places as `~flask.Flask`.
-    """
+class _LoaderAdapter(object):
     
-    def __init__(self, app):
-        self.app = app
-        #: paths from flask app
-        self.paths = {'': os.path.join(self.app.root_path, 'templates')}
-        modules = getattr(self.app, 'modules', {})
-        for name, module in modules.iteritems():
-            module_path = os.path.join(module.root_path, 'templates')
-            if os.path.isdir(module_path):
-                self.paths[name] = module_path
+    def __init__(self, jinja_loader):
+        self.jinja_loader = jinja_loader
     
     def stat(self, template, root):
-        template = '%s%s' % (root or '', template)
-        module_name, sep, template_name = template.rpartition('/')
-        uid = os.path.join(self.paths[module_name], template_name)
-##        if not os.path.isfile(uid):
-##            raise flask.templating.TemplateNotFound(uid)
-        return uid, os.path.getmtime(uid)
+        uid = '%s%s' % (root or '', template)
+        s, fname, u = self.jinja_loader.get_source(None, uid)
+        return uid, os.path.getmtime(fname)
     
     def load(self, uid):
-        with open(uid, 'rU') as f:
-            return f.read()
+        return self.jinja_loader.get_source(None, uid)[0]
 
 
 #: Named configurations for Template instantiation and rendering
@@ -78,70 +62,71 @@ methods = {
     }
 
 
+for k in ['url_for', 'get_flashed_messages']:
+    breve.register_global(k, getattr(flask, k))
+
+
 class Breve(object):
     
-    #: extension for template file names
-    #: breve adds a dot in any case
-    extension = 'b'
-    
-    #: XML declaration string
-    xml_encoding = ''
-    #: Doctype declaration string
-    doctype = '<!DOCTYPE html>'
-    xmlns = 'http://www.w3.org/1999/xhtml'
-    tags = xhtml.tags
-    
-    namespace = None
-    root = None
+    default_options = dict(
+        #: extension for template file names
+        #: breve adds a dot in any case
+        extension = 'b', 
+        
+        #: XML declaration string
+        xml_encoding = '', 
+        #: Doctype declaration string
+        doctype = '<!DOCTYPE html>', 
+        xmlns = 'http://www.w3.org/1999/xhtml', 
+        tags = xhtml.tags, 
+        
+        namespace = None, 
+        root = None
+    )
     
     def __init__(self, app, default_method='(x)html', **options):
         app.breve_instance = self
         self.app = app
-        for k, v in methods[default_method].items() + options.items():
-            setattr(self, k, v)
         
-        # jinja.Environment has decorated versions of these
-        try:
-            from flaskext.babel import gettext, _, ngettext
-            app.context_processor(lambda: {
-                    'gettext': gettext, '_': _, 'ngettext': ngettext})
-        except:
-            pass
+        self.options = self.default_options.copy()
+        self.options.update(methods[default_method])
+        self.options.update(options)
+#        try:
+#            self.inject_babel()
+#        except:
+#            pass
+#    
+#    def inject_babel(self):
+#        from flaskext.babel import gettext, _, ngettext
+#        self.app.context_processor(lambda: {
+#                    'gettext': gettext, '_': _, 'ngettext': ngettext})
 
     @cached_property
     def template_loader(self):
-        return TemplateLoader(self.app)
+        return _LoaderAdapter(self.app.jinja_env.loader)
 
 
-for k in ['url_for', 'get_flashed_messages', 'g']:
-    breve.register_global(k, getattr(flask, k))
-
-
-def render_template(template_name=None, context=None, **options):
+def render_template(template_name=None, context=None, format=None, **options):
     u"""Renders a Brevé template.
     
     :param template_name: as in `flask.render_template` but *without extension*.
     :param context: a dict of context variables
-    :param **options: passed on to `breve.Template` or `breve.Template.render`.
+    :param **options: passed on to `breve.Template`.
     """
     app = flask.current_app
-    
-    context = context or {}
-##    for k in ['config', 'request', 'session', 'g']:
-##        context.setdefault(k, getattr(flask, k))
+    if context is None:
+        context = {}
     app.update_template_context(context)
-    # keep values injected with app.context_processor
-    # not jinja2.contextfunction decorated
-##    for k, v in app.jinja_env.globals.iteritems():
-##        context.setdefault(k, v)
     
     bi = app.breve_instance
-    for k in ['extension', 'xml_encoding', 'doctype', 'xmlns', 'tags', 'root', 'namespace']:
-        options.setdefault(k, getattr(bi, k))
-    format = options.pop('format', None)
+    for k, v in bi.options.iteritems():
+        options.setdefault(k, v)
     
-    return breve.Template(**options).render(template_name, vars=context, 
-                                loader=bi.template_loader, format=format)
+    template = breve.Template(**options)
+    rt = template.render(template_name, vars=context, 
+                                    loader=bi.template_loader, format=format)
+    template_rendered.send(app, template=template, context=context)
+    return rt
 
 
 def flattened_by(method_name):
